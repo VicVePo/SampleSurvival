@@ -1,0 +1,12 @@
+Package: SampleSurvival
+Title: Sample Size Calculation for Survival Analysis Studies
+Version: 0.1.0
+Authors@R: 
+    person("Victor J.", "Vera-Ponce", email = "victor_jvp@hotmail.com", role = c("aut", "cre"))
+Description: Calculates the required sample size for multivariable analysis of associated factors in open cohort studies with time-to-event analysis using the events per variable (EPV) method. The package is designed for studies using Cox regression to estimate hazard ratios (HR).
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
+Imports: stats
+LazyData: true
