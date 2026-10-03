@@ -1,18 +1,55 @@
 #' Sample Size Calculation for Survival Analysis (Cox Regression)
 #' 
-#' Calculates the required sample size for multivariable analysis of associated
-#' factors in open cohort studies (survival analysis). Uses the events per 
-#' variable (EPV) method appropriate for Cox regression estimating hazard 
-#' ratios (HR).
-#' 
-#' @param k Number of independent variables to include in the multivariable model
+#' Plans an expected event-count target for survival studies using an
+#' events-per-predictor-parameter heuristic, commonly used alongside Cox
+#' regression. The calculator does not fit or evaluate a Cox model.
+#'
+#' @param k Number of predictor coefficients, excluding the intercept
 #' @param event_rate Expected proportion that will experience the event during 
 #'   follow-up (between 0 and 1). For example, 0.15 = 15% will have the event
-#' @param EPV Events per variable (recommended 20-50)
+#' @param EPV Chosen events-per-predictor-parameter target. Default is 20,
+#'   an operational planning criterion, not a universal threshold
 #' @param scenarios Logical. If TRUE, calculates sample sizes for multiple 
 #'   EPV values (10, 20, 30, 40, 50)
 #' @param language Language for messages: 'en' (English) or 'es' (Spanish). Default is 'en'
-#' @return List or data.frame with results
+#' @return List or data.frame with results. For single calculations,
+#'   n_parameters is k; n_variables is retained as a compatibility alias
+#' @details
+#' The conventional abbreviation EPV is retained, but its denominator is the
+#' number of predictor coefficients, excluding the intercept. A categorical
+#' predictor with c levels contributes c-1 coefficients when indicator coded.
+#' A single linear or prespecified transformed continuous term contributes one;
+#' polynomial, spline basis and interaction terms contribute their respective
+#' coefficients. Users specify k from the planned model matrix; the calculator
+#' does not construct the matrix. Use the same counting convention in VerifyEPV().
+#'
+#' EPV=20 is the default planning choice, not a universal adequacy threshold.
+#' The output satisfies an expected event-count criterion; no model is fitted
+#' and stability, precision, confidence-interval coverage and model assumptions
+#' are not assessed. The formulas do not adjust for overdispersion, clustering,
+#' collinearity or uncertainty in outcome frequency.
+#'
+#' The output denotes the required analytical sample. If complete-case analysis
+#' is planned, an anticipated exclusion proportion m may be allowed for using
+#' ceiling(n/(1-m)), assuming the event proportion among analyzable participants
+#' matches the planning input. Account jointly for missingness and other losses
+#' without double counting. This inflation does not correct selection bias or
+#' quantify the information retained by multiple imputation. VerifyEPV() uses
+#' events in the analytical sample and its predictor-parameter count.
+#'
+#' Specify probabilities on a 0-1 scale, for example 0.75 for 75 percent.
+#' Use comparable populations and outcome definitions; cumulative incidence
+#' and observed survival event proportions must match the observation horizon.
+#' Without reliable estimates, document plausible values and repeat calls across
+#' that range. scenarios=TRUE varies EPV, not the outcome frequency.
+#'
+#' Model-specific assumptions still require separate assessment, including
+#' proportional hazards and censoring assumptions for Cox analyses. Recruitment
+#' feasibility should be evaluated separately from statistical adequacy.
+#' @references
+#' van Smeden M, et al. (2016). No rationale for 1 variable per 10 events
+#' criterion for binary logistic regression analysis. BMC Medical Research
+#' Methodology 16:163. doi:10.1186/s12874-016-0267-3.
 #' @export
 #' @examples
 #' # Open cohort with 20% expected events
@@ -23,6 +60,9 @@
 #' 
 #' # View multiple scenarios
 #' SampleSurvival(k = 10, event_rate = 0.20, scenarios = TRUE)
+#'
+#' # Age, binary sex and four-level education require five coefficients.
+#' SampleSurvival(k = 5, event_rate = 0.18, EPV = 20)
 SampleSurvival <- function(k, event_rate, EPV = 20, scenarios = FALSE, language = 'en') {
   
   if (!language %in% c('en', 'es')) {
@@ -31,8 +71,8 @@ SampleSurvival <- function(k, event_rate, EPV = 20, scenarios = FALSE, language 
   
   if (missing(k)) {
     stop(ifelse(language == 'es',
-                'Debe especificar k (numero de variables)',
-                'You must specify k (number of variables)'))
+                'Debe especificar k (numero de parametros predictores sin intercepto)',
+                'You must specify k (number of predictor parameters excluding the intercept)'))
   }
   if (missing(event_rate)) {
     stop(ifelse(language == 'es',
@@ -66,19 +106,19 @@ SampleSurvival <- function(k, event_rate, EPV = 20, scenarios = FALSE, language 
     
     if (language == 'es') {
       names(res) <- c('EPV', 'eventos_necesarios', 'censurados_esperados', 'n_total')
-      cat('\nESCENARIOS DE TAMAÑO MUESTRAL - ANALISIS SUPERVIVENCIA\n')
-      cat('Variables (k):', k, '\n')
+      cat('\nESCENARIOS DE TAMA\u00d1O MUESTRAL - ANALISIS SUPERVIVENCIA\n')
+      cat('Parametros predictores (k, sin intercepto):', k, '\n')
       cat('Tasa de eventos esperada:', event_rate*100, '%\n\n')
       print(res, row.names = FALSE)
-      cat('\nRecomendacion: EPV >= 20\n')
+      cat('\nCriterio predeterminado: EPV = 20; no garantiza estabilidad\n')
       cat('Nota: n_total incluye tanto eventos como censurados\n\n')
     } else {
       names(res) <- c('EPV', 'events_needed', 'censored_expected', 'n_total')
       cat('\nSAMPLE SIZE SCENARIOS - SURVIVAL ANALYSIS\n')
-      cat('Variables (k):', k, '\n')
+      cat('Predictor parameters (k, excluding intercept):', k, '\n')
       cat('Expected event rate:', event_rate*100, '%\n\n')
       print(res, row.names = FALSE)
-      cat('\nRecommendation: EPV >= 20\n')
+      cat('\nDefault planning criterion: EPV = 20; no guarantee of stability\n')
       cat('Note: n_total includes both events and censored\n\n')
     }
     return(invisible(res))
@@ -86,8 +126,8 @@ SampleSurvival <- function(k, event_rate, EPV = 20, scenarios = FALSE, language 
   
   if (EPV < 10) {
     warning(ifelse(language == 'es',
-                   'EPV < 10 muy bajo. Se recomienda EPV >= 20',
-                   'EPV < 10 very low. EPV >= 20 is recommended'))
+                   'EPV elegido < 10; evaluar precision y supuestos por separado',
+                   'Chosen EPV < 10; assess precision and assumptions separately'))
   }
   
   # Calculations
@@ -107,58 +147,49 @@ SampleSurvival <- function(k, event_rate, EPV = 20, scenarios = FALSE, language 
     events_needed = events_needed,
     censored_expected = n_censored,
     n_total = n_total,
-    language = language
+    language = language,
+    n_parameters = k
   )
   class(resultados) <- c('SampleSurvival', 'list')
   
   if (language == 'es') {
-    cat('\n=== TAMAÑO MUESTRAL - ANALISIS SUPERVIVENCIA (COX) ===\n')
+    cat('\n=== TAMA\u00d1O MUESTRAL - ANALISIS SUPERVIVENCIA (COX) ===\n')
     cat('Modelo: Regresion de Cox (HR)\n')
-    cat('Variables (k):', k, '\n')
+    cat('Parametros predictores (k, sin intercepto):', k, '\n')
     cat('EPV:', EPV, '\n')
     cat('Tasa de eventos esperada:', event_rate*100, '%\n')
-    cat('─────────────────────────────────────────────────\n')
+    cat('\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n')
     cat('Eventos necesarios:', events_needed, '\n')
     cat('Censurados esperados:', n_censored, '\n')
-    cat('\n>>> TAMAÑO TOTAL:', n_total, '<<<\n\n')
+    cat('\n>>> TAMA\u00d1O TOTAL:', n_total, '<<<\n\n')
     
-    if (EPV < 20) {
-      cat('⚠️  ADVERTENCIA: EPV < 20 puede comprometer validez\n')
-      cat('   de estimaciones en modelos de Cox\n\n')
-    } else if (EPV >= 50) {
-      cat('✓ Excelente: EPV >= 50 proporciona estimaciones muy robustas\n\n')
-    }
+    cat('EPV es un criterio de conteo de eventos; no garantiza precision ni estabilidad del modelo.\n\n')
     
     if (event_rate < 0.10) {
-      cat('ℹ️  Nota: Tasa de eventos baja (<10%). El seguimiento debe ser\n')
+      cat('\u2139\ufe0f  Nota: Tasa de eventos baja (<10%). El seguimiento debe ser\n')
       cat('   lo suficientemente largo para alcanzar los eventos necesarios\n\n')
     } else if (event_rate > 0.50) {
-      cat('ℹ️  Nota: Tasa de eventos alta (>50%). Considere si el supuesto\n')
+      cat('\u2139\ufe0f  Nota: Tasa de eventos alta (>50%). Considere si el supuesto\n')
       cat('   de riesgos proporcionales es apropiado\n\n')
     }
   } else {
     cat('\n=== SAMPLE SIZE - SURVIVAL ANALYSIS (COX) ===\n')
     cat('Model: Cox regression (HR)\n')
-    cat('Variables (k):', k, '\n')
+    cat('Predictor parameters (k, excluding intercept):', k, '\n')
     cat('EPV:', EPV, '\n')
     cat('Expected event rate:', event_rate*100, '%\n')
-    cat('─────────────────────────────────────────────────\n')
+    cat('\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n')
     cat('Events needed:', events_needed, '\n')
     cat('Censored expected:', n_censored, '\n')
     cat('\n>>> TOTAL SIZE:', n_total, '<<<\n\n')
     
-    if (EPV < 20) {
-      cat('⚠️  WARNING: EPV < 20 may compromise validity\n')
-      cat('   of estimates in Cox models\n\n')
-    } else if (EPV >= 50) {
-      cat('✓ Excellent: EPV >= 50 provides very robust estimates\n\n')
-    }
+    cat('EPV is an event-count planning criterion; it does not guarantee precision or model stability.\n\n')
     
     if (event_rate < 0.10) {
-      cat('ℹ️  Note: Low event rate (<10%). Follow-up must be\n')
+      cat('\u2139\ufe0f  Note: Low event rate (<10%). Follow-up must be\n')
       cat('   long enough to reach the needed events\n\n')
     } else if (event_rate > 0.50) {
-      cat('ℹ️  Note: High event rate (>50%). Consider if the\n')
+      cat('\u2139\ufe0f  Note: High event rate (>50%). Consider if the\n')
       cat('   proportional hazards assumption is appropriate\n\n')
     }
   }
@@ -176,9 +207,17 @@ SampleSurvival <- function(k, event_rate, EPV = 20, scenarios = FALSE, language 
 #' @param eligibility_rate Proportion of eligible people (0-1)
 #' @param subjects_per_month People that can be recruited per month
 #' @param follow_up_months Maximum follow-up time in months
-#' @param annual_event_rate Annual event rate (to estimate when needed events will be reached)
+#' @param annual_event_rate Anticipated annual event proportion used only for
+#'   descriptive output and a low-frequency note, not for calculating duration
 #' @param language Language for messages: 'en' (English) or 'es' (Spanish). Default is 'en'
 #' @return List with logistical requirements
+#' @details
+#' Proportions use a 0-1 scale: 75 percent eligibility is 0.75 and 12 percent
+#' anticipated loss is 0.12. Duration is recruitment time plus follow-up of the
+#' last recruited participant. annual_event_rate does not determine duration or
+#' expected event accrual. The event proportion used in SampleSurvival() must
+#' correspond to the planned observation horizon; it is not necessarily an
+#' annual probability multiplied by the number of years.
 #' @export
 SurvivalLogistics <- function(n_final,
                              loss_rate,
@@ -270,7 +309,7 @@ SurvivalLogistics <- function(n_final,
   if (language == 'es') {
     cat('\n=== LOGISTICA - ANALISIS SUPERVIVENCIA ===\n\n')
     cat('PARAMETROS:\n')
-    cat('─────────────────────────────────────────────────\n')
+    cat('\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n')
     cat('Tasa de perdida esperada:', loss_rate*100, '%\n')
     cat('Tasa de elegibilidad:', eligibility_rate*100, '%\n')
     cat('Capacidad reclutamiento:', subjects_per_month, 'personas/mes\n')
@@ -278,7 +317,7 @@ SurvivalLogistics <- function(n_final,
     cat('Tasa de eventos:', annual_event_rate*100, '% anual\n\n')
     
     cat('REQUERIMIENTOS:\n')
-    cat('─────────────────────────────────────────────────\n')
+    cat('\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n')
     cat('Cohorte final requerida:', n_final, 'participantes\n')
     cat('Cohorte inicial a reclutar:', n_recruit, 'participantes\n')
     cat('  (ajustado por', loss_rate*100, '% perdida)\n')
@@ -287,33 +326,33 @@ SurvivalLogistics <- function(n_final,
     cat('Perdidas esperadas:', n_losses, 'participantes\n\n')
     
     cat('TIEMPO ESTIMADO:\n')
-    cat('─────────────────────────────────────────────────\n')
+    cat('\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n')
     cat('Reclutamiento:', months_recruitment, 'meses\n')
     cat('Seguimiento maximo:', follow_up_months, 'meses\n')
     cat('\n>>> DURACION TOTAL:', total_months, 'meses (',
-        round(total_months/12, 1), 'años) <<<\n')
-    cat('─────────────────────────────────────────────────\n\n')
+        round(total_months/12, 1), 'a\u00f1os) <<<\n')
+    cat('\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\n')
     
     if (total_months > 60) {
-      cat('⚠️  ADVERTENCIA: Estudio > 5 años. Evaluar factibilidad\n\n')
+      cat('\u26a0\ufe0f  ADVERTENCIA: Estudio > 5 a\u00f1os. Evaluar factibilidad\n\n')
     } else if (total_months > 36) {
-      cat('ℹ️  Nota: Estudio > 3 años. Planifique recursos a largo plazo\n\n')
+      cat('\u2139\ufe0f  Nota: Estudio > 3 a\u00f1os. Planifique recursos a largo plazo\n\n')
     }
     
     if (loss_rate > 0.20) {
-      cat('⚠️  ADVERTENCIA: Tasa de perdida alta (>20%)\n')
+      cat('\u26a0\ufe0f  ADVERTENCIA: Tasa de perdida alta (>20%)\n')
       cat('   La censura informativa puede sesgar resultados\n')
       cat('   Implemente estrategias rigurosas de retencion\n\n')
     }
     
     if (annual_event_rate < 0.05) {
-      cat('ℹ️  Nota: Tasa de eventos baja (<5% anual)\n')
+      cat('\u2139\ufe0f  Nota: Tasa de eventos baja (<5% anual)\n')
       cat('   Puede requerir seguimiento mas prolongado\n\n')
     }
   } else {
     cat('\n=== LOGISTICS - SURVIVAL ANALYSIS ===\n\n')
     cat('PARAMETERS:\n')
-    cat('─────────────────────────────────────────────────\n')
+    cat('\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n')
     cat('Expected loss rate:', loss_rate*100, '%\n')
     cat('Eligibility rate:', eligibility_rate*100, '%\n')
     cat('Recruitment capacity:', subjects_per_month, 'people/month\n')
@@ -321,7 +360,7 @@ SurvivalLogistics <- function(n_final,
     cat('Event rate:', annual_event_rate*100, '% annual\n\n')
     
     cat('REQUIREMENTS:\n')
-    cat('─────────────────────────────────────────────────\n')
+    cat('\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n')
     cat('Final cohort required:', n_final, 'participants\n')
     cat('Initial cohort to recruit:', n_recruit, 'participants\n')
     cat('  (adjusted for', loss_rate*100, '% loss)\n')
@@ -330,27 +369,27 @@ SurvivalLogistics <- function(n_final,
     cat('Expected losses:', n_losses, 'participants\n\n')
     
     cat('ESTIMATED TIME:\n')
-    cat('─────────────────────────────────────────────────\n')
+    cat('\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n')
     cat('Recruitment:', months_recruitment, 'months\n')
     cat('Maximum follow-up:', follow_up_months, 'months\n')
     cat('\n>>> TOTAL DURATION:', total_months, 'months (',
         round(total_months/12, 1), 'years) <<<\n')
-    cat('─────────────────────────────────────────────────\n\n')
+    cat('\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\n')
     
     if (total_months > 60) {
-      cat('⚠️  WARNING: Study > 5 years. Evaluate feasibility\n\n')
+      cat('\u26a0\ufe0f  WARNING: Study > 5 years. Evaluate feasibility\n\n')
     } else if (total_months > 36) {
-      cat('ℹ️  Note: Study > 3 years. Plan for long-term resources\n\n')
+      cat('\u2139\ufe0f  Note: Study > 3 years. Plan for long-term resources\n\n')
     }
     
     if (loss_rate > 0.20) {
-      cat('⚠️  WARNING: High loss rate (>20%)\n')
+      cat('\u26a0\ufe0f  WARNING: High loss rate (>20%)\n')
       cat('   Informative censoring may bias results\n')
       cat('   Implement rigorous retention strategies\n\n')
     }
     
     if (annual_event_rate < 0.05) {
-      cat('ℹ️  Note: Low event rate (<5% annual)\n')
+      cat('\u2139\ufe0f  Note: Low event rate (<5% annual)\n')
       cat('   May require longer follow-up\n\n')
     }
   }
@@ -360,13 +399,22 @@ SurvivalLogistics <- function(n_final,
 
 #' Post-Study EPV Verification (Survival Analysis)
 #' 
-#' Verifies if the observed EPV at the end of survival analysis is adequate
+#' Reports the observed events per predictor parameter without fitting a model
 #' 
 #' @param n_final Final sample in analysis
 #' @param n_events Number of events observed (not censored)
-#' @param k Number of variables in the Cox model
+#' @param k Number of predictor coefficients, excluding the intercept
 #' @param language Language for messages: 'en' (English) or 'es' (Spanish). Default is 'en'
-#' @return List with observed EPV and evaluation
+#' @return List with observed EPV and analytical counts
+#' @details
+#' k is the number of predictor coefficients excluding the intercept, using the
+#' same convention as the initial sample-size calculation. Count c-1 indicator
+#' coefficients for a categorical predictor with c levels and count all
+#' polynomial, spline and interaction coefficients included in the model.
+#' Use events from the analytical sample after the planned missing-data handling.
+#' This function reports the observed event-per-parameter ratio. It does not fit
+#' a regression model or assess stability, precision or model assumptions, and
+#' it does not certify adequacy from a fixed EPV threshold.
 #' @export
 VerifyEPV <- function(n_final, n_events, k, language = 'en') {
   
@@ -386,46 +434,35 @@ VerifyEPV <- function(n_final, n_events, k, language = 'en') {
   }
   if (missing(k)) {
     stop(ifelse(language == 'es',
-                'Especifique k (numero de variables)',
-                'Specify k (number of variables)'))
+                'Especifique k (numero de parametros predictores sin intercepto)',
+                'Specify k (number of predictor parameters excluding the intercept)'))
   }
   
+  if (k <= 0 || k != round(k)) {
+    stop(ifelse(language == 'es',
+                'k debe ser entero positivo (parametros predictores sin intercepto)',
+                'k must be a positive integer (predictor parameters excluding intercept)'))
+  }
+
   EPV_observed <- n_events / k
   observed_event_rate <- n_events / n_final
   n_censored <- n_final - n_events
   
   if (language == 'es') {
-    cat('\n=== VERIFICACIÓN EPV POST-ESTUDIO (COX) ===\n')
+    cat('\n=== VERIFICACI\u00d3N EPV POST-ESTUDIO (COX) ===\n')
     cat('Muestra final analizada:', n_final, '\n')
     cat('Eventos observados:', n_events, '\n')
     cat('Censurados:', n_censored, '\n')
-    cat('Variables en modelo Cox:', k, '\n')
+    cat('Parametros predictores en modelo Cox (sin intercepto):', k, '\n')
     cat('Tasa de eventos observada:', round(observed_event_rate*100, 2), '%\n')
     cat('\n>>> EPV OBSERVADO:', round(EPV_observed, 2), '<<<\n\n')
     
-    if (EPV_observed < 10) {
-      cat('❌ CRÍTICO: EPV < 10 en modelo de Cox\n')
-      cat('   Los estimadores del HR son muy inestables\n')
-      cat('   Recomendacion: Reducir numero de variables o considerar\n')
-      cat('   tecnicas de penalizacion (ridge Cox, lasso Cox)\n\n')
-    } else if (EPV_observed < 20) {
-      cat('⚠️  ADVERTENCIA: EPV < 20 en modelo de Cox\n')
-      cat('   Interpretacion cautelosa requerida\n')
-      cat('   Recomendacion: Reportar como limitacion y realizar\n')
-      cat('   analisis de sensibilidad. Verificar supuesto de\n')
-      cat('   riesgos proporcionales cuidadosamente\n\n')
-    } else if (EPV_observed >= 20 && EPV_observed < 30) {
-      cat('✓ Aceptable: EPV >= 20\n')
-      cat('  El modelo cumple el minimo recomendado para Cox\n\n')
-    } else {
-      cat('✓✓ Excelente: EPV >= 30\n')
-      cat('   El modelo de Cox tiene estimaciones robustas\n\n')
-    }
+    cat('El EPV observado resume eventos por parametro; no evalua estabilidad, precision ni adecuacion del modelo.\n\n')
     
     # Additional warning about censoring
     censoring_proportion <- n_censored / n_final
     if (censoring_proportion > 0.50) {
-      cat('ℹ️  Nota: Alta proporcion de censura (>', round(censoring_proportion*100), '%)\n')
+      cat('\u2139\ufe0f  Nota: Alta proporcion de censura (>', round(censoring_proportion*100), '%)\n')
       cat('   Verifique si la censura es informativa\n\n')
     }
   } else {
@@ -433,33 +470,16 @@ VerifyEPV <- function(n_final, n_events, k, language = 'en') {
     cat('Final sample analyzed:', n_final, '\n')
     cat('Events observed:', n_events, '\n')
     cat('Censored:', n_censored, '\n')
-    cat('Variables in Cox model:', k, '\n')
+    cat('Predictor parameters in Cox model (excluding intercept):', k, '\n')
     cat('Observed event rate:', round(observed_event_rate*100, 2), '%\n')
     cat('\n>>> OBSERVED EPV:', round(EPV_observed, 2), '<<<\n\n')
     
-    if (EPV_observed < 10) {
-      cat('❌ CRITICAL: EPV < 10 in Cox model\n')
-      cat('   HR estimators are very unstable\n')
-      cat('   Recommendation: Reduce number of variables or consider\n')
-      cat('   penalization techniques (ridge Cox, lasso Cox)\n\n')
-    } else if (EPV_observed < 20) {
-      cat('⚠️  WARNING: EPV < 20 in Cox model\n')
-      cat('   Cautious interpretation required\n')
-      cat('   Recommendation: Report as limitation and perform\n')
-      cat('   sensitivity analysis. Carefully verify proportional\n')
-      cat('   hazards assumption\n\n')
-    } else if (EPV_observed >= 20 && EPV_observed < 30) {
-      cat('✓ Acceptable: EPV >= 20\n')
-      cat('  Model meets minimum recommended for Cox\n\n')
-    } else {
-      cat('✓✓ Excellent: EPV >= 30\n')
-      cat('   Cox model has robust estimates\n\n')
-    }
+    cat('Observed EPV summarizes events per parameter; it does not assess stability, precision or model adequacy.\n\n')
     
     # Additional warning about censoring
     censoring_proportion <- n_censored / n_final
     if (censoring_proportion > 0.50) {
-      cat('ℹ️  Note: High proportion of censoring (>', round(censoring_proportion*100), '%)\n')
+      cat('\u2139\ufe0f  Note: High proportion of censoring (>', round(censoring_proportion*100), '%)\n')
       cat('   Verify if censoring is informative\n\n')
     }
   }
@@ -478,7 +498,7 @@ VerifyEPV <- function(n_final, n_events, k, language = 'en') {
 #' @export
 print.SampleSurvival <- function(x, ...) {
   if (x$language == 'es') {
-    cat('\nTAMAÑO MUESTRAL TOTAL:', x$n_total, '\n')
+    cat('\nTAMA\u00d1O MUESTRAL TOTAL:', x$n_total, '\n')
     cat('  Eventos esperados:', x$events_needed, '\n')
     cat('  Censurados esperados:', x$censored_expected, '\n')
   } else {

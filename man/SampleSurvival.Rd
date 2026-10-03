@@ -7,12 +7,13 @@
 SampleSurvival(k, event_rate, EPV = 20, scenarios = FALSE, language = "en")
 }
 \arguments{
-\item{k}{Number of independent variables to include in the multivariable model}
+\item{k}{Number of predictor coefficients, excluding the intercept}
 
 \item{event_rate}{Expected proportion that will experience the event during
 follow-up (between 0 and 1). For example, 0.15 = 15\% will have the event}
 
-\item{EPV}{Events per variable (recommended 20-50)}
+\item{EPV}{Chosen events-per-predictor-parameter target. Default is 20,
+an operational planning criterion, not a universal threshold}
 
 \item{scenarios}{Logical. If TRUE, calculates sample sizes for multiple
 EPV values (10, 20, 30, 40, 50)}
@@ -20,13 +21,46 @@ EPV values (10, 20, 30, 40, 50)}
 \item{language}{Language for messages: 'en' (English) or 'es' (Spanish). Default is 'en'}
 }
 \value{
-List or data.frame with results
+List or data.frame with results. For single calculations,
+n_parameters is k; n_variables is retained as a compatibility alias
 }
 \description{
-Calculates the required sample size for multivariable analysis of associated
-factors in open cohort studies (survival analysis). Uses the events per
-variable (EPV) method appropriate for Cox regression estimating hazard
-ratios (HR).
+Plans an expected event-count target for survival studies using an
+events-per-predictor-parameter heuristic, commonly used alongside Cox
+regression. The calculator does not fit or evaluate a Cox model.
+}
+\details{
+The conventional abbreviation EPV is retained, but its denominator is the
+number of predictor coefficients, excluding the intercept. A categorical
+predictor with c levels contributes c-1 coefficients when indicator coded.
+A single linear or prespecified transformed continuous term contributes one;
+polynomial, spline basis and interaction terms contribute their respective
+coefficients. Users specify k from the planned model matrix; the calculator
+does not construct the matrix. Use the same counting convention in VerifyEPV().
+
+EPV=20 is the default planning choice, not a universal adequacy threshold.
+The output satisfies an expected event-count criterion; no model is fitted
+and stability, precision, confidence-interval coverage and model assumptions
+are not assessed. The formulas do not adjust for overdispersion, clustering,
+collinearity or uncertainty in outcome frequency.
+
+The output denotes the required analytical sample. If complete-case analysis
+is planned, an anticipated exclusion proportion m may be allowed for using
+ceiling(n/(1-m)), assuming the event proportion among analyzable participants
+matches the planning input. Account jointly for missingness and other losses
+without double counting. This inflation does not correct selection bias or
+quantify the information retained by multiple imputation. VerifyEPV() uses
+events in the analytical sample and its predictor-parameter count.
+
+Specify probabilities on a 0-1 scale, for example 0.75 for 75 percent.
+Use comparable populations and outcome definitions; cumulative incidence
+and observed survival event proportions must match the observation horizon.
+Without reliable estimates, document plausible values and repeat calls across
+that range. scenarios=TRUE varies EPV, not the outcome frequency.
+
+Model-specific assumptions still require separate assessment, including
+proportional hazards and censoring assumptions for Cox analyses. Recruitment
+feasibility should be evaluated separately from statistical adequacy.
 }
 \examples{
 # Open cohort with 20\% expected events
@@ -37,4 +71,12 @@ SampleSurvival(k = 10, event_rate = 0.20, EPV = 20, language = 'es')
 
 # View multiple scenarios
 SampleSurvival(k = 10, event_rate = 0.20, scenarios = TRUE)
+
+# Age, binary sex and four-level education require five coefficients.
+SampleSurvival(k = 5, event_rate = 0.18, EPV = 20)
+}
+\references{
+van Smeden M, et al. (2016). No rationale for 1 variable per 10 events
+criterion for binary logistic regression analysis. BMC Medical Research
+Methodology 16:163. doi:10.1186/s12874-016-0267-3.
 }

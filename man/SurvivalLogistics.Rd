@@ -25,7 +25,8 @@ SurvivalLogistics(
 
 \item{follow_up_months}{Maximum follow-up time in months}
 
-\item{annual_event_rate}{Annual event rate (to estimate when needed events will be reached)}
+\item{annual_event_rate}{Anticipated annual event proportion used only for
+descriptive output and a low-frequency note, not for calculating duration}
 
 \item{language}{Language for messages: 'en' (English) or 'es' (Spanish). Default is 'en'}
 }
@@ -35,4 +36,12 @@ List with logistical requirements
 \description{
 Calculates logistical requirements for a survival study, considering
 recruitment, follow-up, and losses.
+}
+\details{
+Proportions use a 0-1 scale: 75 percent eligibility is 0.75 and 12 percent
+anticipated loss is 0.12. Duration is recruitment time plus follow-up of the
+last recruited participant. annual_event_rate does not determine duration or
+expected event accrual. The event proportion used in SampleSurvival() must
+correspond to the planned observation horizon; it is not necessarily an
+annual probability multiplied by the number of years.
 }

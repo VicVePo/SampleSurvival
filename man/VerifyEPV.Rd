@@ -11,13 +11,23 @@ VerifyEPV(n_final, n_events, k, language = "en")
 
 \item{n_events}{Number of events observed (not censored)}
 
-\item{k}{Number of variables in the Cox model}
+\item{k}{Number of predictor coefficients, excluding the intercept}
 
 \item{language}{Language for messages: 'en' (English) or 'es' (Spanish). Default is 'en'}
 }
 \value{
-List with observed EPV and evaluation
+List with observed EPV and analytical counts
 }
 \description{
-Verifies if the observed EPV at the end of survival analysis is adequate
+Reports the observed events per predictor parameter without fitting a model
+}
+\details{
+k is the number of predictor coefficients excluding the intercept, using the
+same convention as the initial sample-size calculation. Count c-1 indicator
+coefficients for a categorical predictor with c levels and count all
+polynomial, spline and interaction coefficients included in the model.
+Use events from the analytical sample after the planned missing-data handling.
+This function reports the observed event-per-parameter ratio. It does not fit
+a regression model or assess stability, precision or model assumptions, and
+it does not certify adequacy from a fixed EPV threshold.
 }
