@@ -7,23 +7,29 @@
 #' @param k Number of predictor coefficients, excluding the intercept
 #' @param event_rate Expected proportion that will experience the event during 
 #'   follow-up (between 0 and 1). For example, 0.15 = 15% will have the event
-#' @param EPV Chosen events-per-predictor-parameter target. Default is 20,
+#' @param EPP Preferred events-per-predictor-parameter target. If omitted,
+#'   uses EPV or the default of 20.
+#' @param EPV Compatibility name for the same target. If both EPP and EPV
+#'   are supplied, they must agree. Default is 20,
 #'   an operational planning criterion, not a universal threshold
 #' @param scenarios Logical. If TRUE, calculates sample sizes for multiple 
-#'   EPV values (10, 20, 30, 40, 50)
+#'   EPP values (10, 20, 30, 40, 50)
 #' @param language Language for messages: 'en' (English) or 'es' (Spanish). Default is 'en'
 #' @return List or data.frame with results. For single calculations,
-#'   n_parameters is k; n_variables is retained as a compatibility alias
+#'   n_parameters is k; target_EPP is the selected target. n_variables and
+#'   target_EPV are compatibility aliases. Scenario tables contain EPP and EPV.
 #' @details
-#' The conventional abbreviation EPV is retained, but its denominator is the
-#' number of predictor coefficients, excluding the intercept. A categorical
+#' EPP means events per predictor parameter. Its denominator is the number
+#' of predictor coefficients, excluding the intercept. EPV is retained as a
+#' compatibility argument and result field; VerifyEPV() is an alias of
+#' VerifyEPP(). A categorical
 #' predictor with c levels contributes c-1 coefficients when indicator coded.
 #' A single linear or prespecified transformed continuous term contributes one;
 #' polynomial, spline basis and interaction terms contribute their respective
 #' coefficients. Users specify k from the planned model matrix; the calculator
-#' does not construct the matrix. Use the same counting convention in VerifyEPV().
+#' does not construct the matrix. Use the same counting convention in VerifyEPP().
 #'
-#' EPV=20 is the default planning choice, not a universal adequacy threshold.
+#' EPP=20 is the default planning choice, not a universal adequacy threshold.
 #' The output satisfies an expected event-count criterion; no model is fitted
 #' and stability, precision, confidence-interval coverage and model assumptions
 #' are not assessed. The formulas do not adjust for overdispersion, clustering,
@@ -34,14 +40,14 @@
 #' ceiling(n/(1-m)), assuming the event proportion among analyzable participants
 #' matches the planning input. Account jointly for missingness and other losses
 #' without double counting. This inflation does not correct selection bias or
-#' quantify the information retained by multiple imputation. VerifyEPV() uses
+#' quantify the information retained by multiple imputation. VerifyEPP() uses
 #' events in the analytical sample and its predictor-parameter count.
 #'
 #' Specify probabilities on a 0-1 scale, for example 0.75 for 75 percent.
 #' Use comparable populations and outcome definitions; cumulative incidence
 #' and observed survival event proportions must match the observation horizon.
 #' Without reliable estimates, document plausible values and repeat calls across
-#' that range. scenarios=TRUE varies EPV, not the outcome frequency.
+#' that range. scenarios=TRUE varies EPP, not the outcome frequency.
 #'
 #' Model-specific assumptions still require separate assessment, including
 #' proportional hazards and censoring assumptions for Cox analyses. Recruitment
@@ -53,22 +59,36 @@
 #' @export
 #' @examples
 #' # Open cohort with 20% expected events
-#' SampleSurvival(k = 10, event_rate = 0.20, EPV = 20)
+#' SampleSurvival(k = 10, event_rate = 0.20, EPP = 20)
 #' 
 #' # Spanish version
-#' SampleSurvival(k = 10, event_rate = 0.20, EPV = 20, language = 'es')
+#' SampleSurvival(k = 10, event_rate = 0.20, EPP = 20, language = 'es')
 #' 
 #' # View multiple scenarios
 #' SampleSurvival(k = 10, event_rate = 0.20, scenarios = TRUE)
 #'
 #' # Age, binary sex and four-level education require five coefficients.
-#' SampleSurvival(k = 5, event_rate = 0.18, EPV = 20)
-SampleSurvival <- function(k, event_rate, EPV = 20, scenarios = FALSE, language = 'en') {
+#' SampleSurvival(k = 5, event_rate = 0.18, EPP = 20)
+SampleSurvival <- function(k, event_rate, EPV = 20, scenarios = FALSE, language = 'en', EPP = NULL) {
   
   if (!language %in% c('en', 'es')) {
     stop('language must be "en" or "es"')
   }
   
+  if (!is.null(EPP)) {
+    if (length(EPP) != 1L || !is.numeric(EPP) || !is.finite(EPP) || EPP <= 0) {
+      stop(ifelse(language == 'es',
+                  'EPP debe ser un numero finito positivo',
+                  'EPP must be a finite positive number'))
+    }
+    if (!missing(EPV) && !isTRUE(all.equal(EPV, EPP))) {
+      stop(ifelse(language == 'es',
+                  'EPP y EPV deben coincidir si se especifican ambos',
+                  'EPP and EPV must agree when both are supplied'))
+    }
+    EPV <- EPP
+  }
+
   if (missing(k)) {
     stop(ifelse(language == 'es',
                 'Debe especificar k (numero de parametros predictores sin intercepto)',
@@ -91,8 +111,8 @@ SampleSurvival <- function(k, event_rate, EPV = 20, scenarios = FALSE, language 
   }
   if (EPV <= 0) {
     stop(ifelse(language == 'es',
-                'EPV debe ser positivo',
-                'EPV must be positive'))
+                'EPP debe ser positivo',
+                'EPP must be positive'))
   }
   
   if (scenarios) {
@@ -109,16 +129,18 @@ SampleSurvival <- function(k, event_rate, EPV = 20, scenarios = FALSE, language 
       cat('\nESCENARIOS DE TAMA\u00d1O MUESTRAL - ANALISIS SUPERVIVENCIA\n')
       cat('Parametros predictores (k, sin intercepto):', k, '\n')
       cat('Tasa de eventos esperada:', event_rate*100, '%\n\n')
-      print(res, row.names = FALSE)
-      cat('\nCriterio predeterminado: EPV = 20; no garantiza estabilidad\n')
+      res$EPP <- res$EPV
+      print(res[c('EPP', names(res)[!names(res) %in% c('EPV', 'EPP')])], row.names = FALSE)
+      cat('\nCriterio predeterminado: EPP = 20; no garantiza estabilidad\n')
       cat('Nota: n_total incluye tanto eventos como censurados\n\n')
     } else {
       names(res) <- c('EPV', 'events_needed', 'censored_expected', 'n_total')
       cat('\nSAMPLE SIZE SCENARIOS - SURVIVAL ANALYSIS\n')
       cat('Predictor parameters (k, excluding intercept):', k, '\n')
       cat('Expected event rate:', event_rate*100, '%\n\n')
-      print(res, row.names = FALSE)
-      cat('\nDefault planning criterion: EPV = 20; no guarantee of stability\n')
+      res$EPP <- res$EPV
+      print(res[c('EPP', names(res)[!names(res) %in% c('EPV', 'EPP')])], row.names = FALSE)
+      cat('\nDefault planning criterion: EPP = 20; no guarantee of stability\n')
       cat('Note: n_total includes both events and censored\n\n')
     }
     return(invisible(res))
@@ -126,8 +148,8 @@ SampleSurvival <- function(k, event_rate, EPV = 20, scenarios = FALSE, language 
   
   if (EPV < 10) {
     warning(ifelse(language == 'es',
-                   'EPV elegido < 10; evaluar precision y supuestos por separado',
-                   'Chosen EPV < 10; assess precision and assumptions separately'))
+                   'EPP elegido < 10; evaluar precision y supuestos por separado',
+                   'Chosen EPP < 10; assess precision and assumptions separately'))
   }
   
   # Calculations
@@ -148,7 +170,8 @@ SampleSurvival <- function(k, event_rate, EPV = 20, scenarios = FALSE, language 
     censored_expected = n_censored,
     n_total = n_total,
     language = language,
-    n_parameters = k
+    n_parameters = k,
+    target_EPP = EPV
   )
   class(resultados) <- c('SampleSurvival', 'list')
   
@@ -156,14 +179,14 @@ SampleSurvival <- function(k, event_rate, EPV = 20, scenarios = FALSE, language 
     cat('\n=== TAMA\u00d1O MUESTRAL - ANALISIS SUPERVIVENCIA (COX) ===\n')
     cat('Modelo: Regresion de Cox (HR)\n')
     cat('Parametros predictores (k, sin intercepto):', k, '\n')
-    cat('EPV:', EPV, '\n')
+    cat('EPP:', EPV, '\n')
     cat('Tasa de eventos esperada:', event_rate*100, '%\n')
     cat('\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n')
     cat('Eventos necesarios:', events_needed, '\n')
     cat('Censurados esperados:', n_censored, '\n')
     cat('\n>>> TAMA\u00d1O TOTAL:', n_total, '<<<\n\n')
     
-    cat('EPV es un criterio de conteo de eventos; no garantiza precision ni estabilidad del modelo.\n\n')
+    cat('EPP es un criterio de conteo de eventos; no garantiza precision ni estabilidad del modelo.\n\n')
     
     if (event_rate < 0.10) {
       cat('\u2139\ufe0f  Nota: Tasa de eventos baja (<10%). El seguimiento debe ser\n')
@@ -176,14 +199,14 @@ SampleSurvival <- function(k, event_rate, EPV = 20, scenarios = FALSE, language 
     cat('\n=== SAMPLE SIZE - SURVIVAL ANALYSIS (COX) ===\n')
     cat('Model: Cox regression (HR)\n')
     cat('Predictor parameters (k, excluding intercept):', k, '\n')
-    cat('EPV:', EPV, '\n')
+    cat('EPP:', EPV, '\n')
     cat('Expected event rate:', event_rate*100, '%\n')
     cat('\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n')
     cat('Events needed:', events_needed, '\n')
     cat('Censored expected:', n_censored, '\n')
     cat('\n>>> TOTAL SIZE:', n_total, '<<<\n\n')
     
-    cat('EPV is an event-count planning criterion; it does not guarantee precision or model stability.\n\n')
+    cat('EPP is an event-count planning criterion; it does not guarantee precision or model stability.\n\n')
     
     if (event_rate < 0.10) {
       cat('\u2139\ufe0f  Note: Low event rate (<10%). Follow-up must be\n')
@@ -397,7 +420,7 @@ SurvivalLogistics <- function(n_final,
   return(invisible(resultados))
 }
 
-#' Post-Study EPV Verification (Survival Analysis)
+#' Post-Study EPP Verification (Survival Analysis)
 #' 
 #' Reports the observed events per predictor parameter without fitting a model
 #' 
@@ -405,7 +428,7 @@ SurvivalLogistics <- function(n_final,
 #' @param n_events Number of events observed (not censored)
 #' @param k Number of predictor coefficients, excluding the intercept
 #' @param language Language for messages: 'en' (English) or 'es' (Spanish). Default is 'en'
-#' @return List with observed EPV and analytical counts
+#' @return List with observed EPP and analytical counts
 #' @details
 #' k is the number of predictor coefficients excluding the intercept, using the
 #' same convention as the initial sample-size calculation. Count c-1 indicator
@@ -414,9 +437,9 @@ SurvivalLogistics <- function(n_final,
 #' Use events from the analytical sample after the planned missing-data handling.
 #' This function reports the observed event-per-parameter ratio. It does not fit
 #' a regression model or assess stability, precision or model assumptions, and
-#' it does not certify adequacy from a fixed EPV threshold.
+#' it does not certify adequacy from a fixed EPP threshold.
 #' @export
-VerifyEPV <- function(n_final, n_events, k, language = 'en') {
+VerifyEPP <- function(n_final, n_events, k, language = 'en') {
   
   if (!language %in% c('en', 'es')) {
     stop('language must be "en" or "es"')
@@ -449,15 +472,15 @@ VerifyEPV <- function(n_final, n_events, k, language = 'en') {
   n_censored <- n_final - n_events
   
   if (language == 'es') {
-    cat('\n=== VERIFICACI\u00d3N EPV POST-ESTUDIO (COX) ===\n')
+    cat('\n=== VERIFICACI\u00d3N EPP POST-ESTUDIO (COX) ===\n')
     cat('Muestra final analizada:', n_final, '\n')
     cat('Eventos observados:', n_events, '\n')
     cat('Censurados:', n_censored, '\n')
     cat('Parametros predictores en modelo Cox (sin intercepto):', k, '\n')
     cat('Tasa de eventos observada:', round(observed_event_rate*100, 2), '%\n')
-    cat('\n>>> EPV OBSERVADO:', round(EPV_observed, 2), '<<<\n\n')
+    cat('\n>>> EPP OBSERVADO:', round(EPV_observed, 2), '<<<\n\n')
     
-    cat('El EPV observado resume eventos por parametro; no evalua estabilidad, precision ni adecuacion del modelo.\n\n')
+    cat('El EPP observado resume eventos por parametro; no evalua estabilidad, precision ni adecuacion del modelo.\n\n')
     
     # Additional warning about censoring
     censoring_proportion <- n_censored / n_final
@@ -466,15 +489,15 @@ VerifyEPV <- function(n_final, n_events, k, language = 'en') {
       cat('   Verifique si la censura es informativa\n\n')
     }
   } else {
-    cat('\n=== POST-STUDY EPV VERIFICATION (COX) ===\n')
+    cat('\n=== POST-STUDY EPP VERIFICATION (COX) ===\n')
     cat('Final sample analyzed:', n_final, '\n')
     cat('Events observed:', n_events, '\n')
     cat('Censored:', n_censored, '\n')
     cat('Predictor parameters in Cox model (excluding intercept):', k, '\n')
     cat('Observed event rate:', round(observed_event_rate*100, 2), '%\n')
-    cat('\n>>> OBSERVED EPV:', round(EPV_observed, 2), '<<<\n\n')
+    cat('\n>>> OBSERVED EPP:', round(EPV_observed, 2), '<<<\n\n')
     
-    cat('Observed EPV summarizes events per parameter; it does not assess stability, precision or model adequacy.\n\n')
+    cat('Observed EPP summarizes events per parameter; it does not assess stability, precision or model adequacy.\n\n')
     
     # Additional warning about censoring
     censoring_proportion <- n_censored / n_final
@@ -491,7 +514,8 @@ VerifyEPV <- function(n_final, n_events, k, language = 'en') {
     k = k,
     EPV = EPV_observed,
     event_rate = observed_event_rate,
-    language = language
+    language = language,
+    EPP = EPV_observed
   )))
 }
 
@@ -523,3 +547,7 @@ print.SurvivalLogistics <- function(x, ...) {
   invisible(x)
 }
 
+
+#' @rdname VerifyEPP
+#' @export
+VerifyEPV <- VerifyEPP

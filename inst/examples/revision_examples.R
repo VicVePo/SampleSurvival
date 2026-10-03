@@ -1,4 +1,4 @@
-# Version 0.1.1: predictor-parameter counting example.
+# Version 0.1.2: predictor-parameter counting example.
 # This grid defines coding; it is not a patient dataset.
 design <- expand.grid(age=c(30,40,50,60,70),
                       sex=factor(c("F","M")),
@@ -6,8 +6,8 @@ design <- expand.grid(age=c(30,40,50,60,70),
 mm <- stats::model.matrix(~ age + sex + education, data=design)
 k <- sum(colnames(mm) != "(Intercept)")
 stopifnot(k == 5L, qr(mm)$rank == ncol(mm))
-planned <- SampleSurvival::SampleSurvival(k=k, EPV=20, event_rate=0.18)
-SampleSurvival::VerifyEPV(n_final=planned$n_total,
+planned <- SampleSurvival::SampleSurvival(k=k, EPP=20, event_rate=0.18)
+SampleSurvival::VerifyEPP(n_final=planned$n_total,
                        n_events=planned$events_needed, k=k)
 
 # A log transformation uses one coefficient; nonlinear terms can use more.
@@ -24,7 +24,7 @@ stopifnot(identical(unname(parameter_counts),c(5L,5L,6L,7L,6L)))
 print(parameter_counts)
 
 # Reuse the computed target rather than typing 1333 or 1334 manually.
-renal <- SampleSurvival::SampleSurvival(k=12, event_rate=0.18, EPV=20)
+renal <- SampleSurvival::SampleSurvival(k=12, event_rate=0.18, EPP=20)
 logistics <- SampleSurvival::SurvivalLogistics(
     n_final=renal$n_total, loss_rate=0.12, eligibility_rate=0.75,
     subjects_per_month=25, follow_up_months=60, annual_event_rate=0.036)

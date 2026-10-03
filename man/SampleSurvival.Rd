@@ -4,7 +4,14 @@
 \alias{SampleSurvival}
 \title{Sample Size Calculation for Survival Analysis (Cox Regression)}
 \usage{
-SampleSurvival(k, event_rate, EPV = 20, scenarios = FALSE, language = "en")
+SampleSurvival(
+  k,
+  event_rate,
+  EPV = 20,
+  scenarios = FALSE,
+  language = "en",
+  EPP = NULL
+)
 }
 \arguments{
 \item{k}{Number of predictor coefficients, excluding the intercept}
@@ -12,17 +19,22 @@ SampleSurvival(k, event_rate, EPV = 20, scenarios = FALSE, language = "en")
 \item{event_rate}{Expected proportion that will experience the event during
 follow-up (between 0 and 1). For example, 0.15 = 15\% will have the event}
 
-\item{EPV}{Chosen events-per-predictor-parameter target. Default is 20,
+\item{EPV}{Compatibility name for the same target. If both EPP and EPV
+are supplied, they must agree. Default is 20,
 an operational planning criterion, not a universal threshold}
 
 \item{scenarios}{Logical. If TRUE, calculates sample sizes for multiple
-EPV values (10, 20, 30, 40, 50)}
+EPP values (10, 20, 30, 40, 50)}
 
 \item{language}{Language for messages: 'en' (English) or 'es' (Spanish). Default is 'en'}
+
+\item{EPP}{Preferred events-per-predictor-parameter target. If omitted,
+uses EPV or the default of 20.}
 }
 \value{
 List or data.frame with results. For single calculations,
-n_parameters is k; n_variables is retained as a compatibility alias
+n_parameters is k; target_EPP is the selected target. n_variables and
+target_EPV are compatibility aliases. Scenario tables contain EPP and EPV.
 }
 \description{
 Plans an expected event-count target for survival studies using an
@@ -30,15 +42,17 @@ events-per-predictor-parameter heuristic, commonly used alongside Cox
 regression. The calculator does not fit or evaluate a Cox model.
 }
 \details{
-The conventional abbreviation EPV is retained, but its denominator is the
-number of predictor coefficients, excluding the intercept. A categorical
+EPP means events per predictor parameter. Its denominator is the number
+of predictor coefficients, excluding the intercept. EPV is retained as a
+compatibility argument and result field; VerifyEPV() is an alias of
+VerifyEPP(). A categorical
 predictor with c levels contributes c-1 coefficients when indicator coded.
 A single linear or prespecified transformed continuous term contributes one;
 polynomial, spline basis and interaction terms contribute their respective
 coefficients. Users specify k from the planned model matrix; the calculator
-does not construct the matrix. Use the same counting convention in VerifyEPV().
+does not construct the matrix. Use the same counting convention in VerifyEPP().
 
-EPV=20 is the default planning choice, not a universal adequacy threshold.
+EPP=20 is the default planning choice, not a universal adequacy threshold.
 The output satisfies an expected event-count criterion; no model is fitted
 and stability, precision, confidence-interval coverage and model assumptions
 are not assessed. The formulas do not adjust for overdispersion, clustering,
@@ -49,14 +63,14 @@ is planned, an anticipated exclusion proportion m may be allowed for using
 ceiling(n/(1-m)), assuming the event proportion among analyzable participants
 matches the planning input. Account jointly for missingness and other losses
 without double counting. This inflation does not correct selection bias or
-quantify the information retained by multiple imputation. VerifyEPV() uses
+quantify the information retained by multiple imputation. VerifyEPP() uses
 events in the analytical sample and its predictor-parameter count.
 
 Specify probabilities on a 0-1 scale, for example 0.75 for 75 percent.
 Use comparable populations and outcome definitions; cumulative incidence
 and observed survival event proportions must match the observation horizon.
 Without reliable estimates, document plausible values and repeat calls across
-that range. scenarios=TRUE varies EPV, not the outcome frequency.
+that range. scenarios=TRUE varies EPP, not the outcome frequency.
 
 Model-specific assumptions still require separate assessment, including
 proportional hazards and censoring assumptions for Cox analyses. Recruitment
@@ -64,16 +78,16 @@ feasibility should be evaluated separately from statistical adequacy.
 }
 \examples{
 # Open cohort with 20\% expected events
-SampleSurvival(k = 10, event_rate = 0.20, EPV = 20)
+SampleSurvival(k = 10, event_rate = 0.20, EPP = 20)
 
 # Spanish version
-SampleSurvival(k = 10, event_rate = 0.20, EPV = 20, language = 'es')
+SampleSurvival(k = 10, event_rate = 0.20, EPP = 20, language = 'es')
 
 # View multiple scenarios
 SampleSurvival(k = 10, event_rate = 0.20, scenarios = TRUE)
 
 # Age, binary sex and four-level education require five coefficients.
-SampleSurvival(k = 5, event_rate = 0.18, EPV = 20)
+SampleSurvival(k = 5, event_rate = 0.18, EPP = 20)
 }
 \references{
 van Smeden M, et al. (2016). No rationale for 1 variable per 10 events
